@@ -1,110 +1,172 @@
 import React, { useState } from 'react';
 import './App.css';
 
-// Base de datos de ejemplo de sets de LEGO y sus ideas alternativas
-const legoIdeasDB = {
-  "21181": {
-    name: "La Granja de Conejos (Minecraft)",
-    ideas: [
-      "Una torre de vigilancia para protegerse del zombi.",
-      "Un corral de zanahorias más grande y cercado.",
-      "Un pequeño escondite subterráneo para el jugador.",
-      "Un puente para cruzar la cueva.",
-      "Una estatua gigante de un conejo.",
-      "Un puesto de mercado para intercambiar zanahorias.",
-      "Una catapulta para lanzar zanahorias al zombi."
-    ]
+const MODEL_NAME = 'gemini-1.5-flash';
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent`;
+const REQUEST_HEADERS = {
+  'Content-Type': 'application/json',
+};
+
+const RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    setNumber: { type: 'STRING' },
+    setName: { type: 'STRING' },
+    pieces: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          partNumber: { type: 'STRING' },
+          name: { type: 'STRING' },
+          color: { type: 'STRING' },
+          quantity: { type: 'INTEGER' },
+        },
+        required: ['name'],
+      },
+    },
+    ideas: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          title: { type: 'STRING' },
+          description: { type: 'STRING' },
+          instructions: {
+            type: 'ARRAY',
+            items: { type: 'STRING' },
+          },
+        },
+        required: ['title', 'instructions'],
+      },
+    },
   },
-  "31058": {
-    name: "Dinosaurio Poderoso",
-    ideas: [
-      "Un Pterodáctilo.",
-      "Un Triceratops.",
-      "Un Brontosaurio.",
-      "Un coche de carreras futurista.",
-      "Una nave espacial de exploración.",
-      "Una estación de investigación de dinosaurios.",
-      "Un robot dinosaurio gigante."
-    ]
-  },
-  "10696": {
-    name: "Caja de Ladrillos Creativos Mediana",
-    ideas: [
-      "Un pequeño castillo con un puente levadizo.",
-      "Una flota de 3 naves espaciales diferentes.",
-      "Un robot transformable en vehículo.",
-      "Una casa de dos pisos con jardín.",
-      "Un dinosaurio (T-Rex).",
-      "Un avión de hélice y una torre de control.",
-      "Un pulpo y un submarino de exploración."
-    ]
-  },
-  "31131": {
-    name: "Tienda de Fideos del Centro",
-    ideas: [
-      "Un hotel boutique con recepción y terraza.",
-      "Una casa adosada de estilo europeo.",
-      "Una sala de juegos arcade con máquinas diferentes.",
-      "Una tienda de bicicletas con un taller.",
-      "Un pequeño museo de arte moderno.",
-      "Una estación de bomberos con un vehículo pequeño.",
-      "Un invernadero urbano con un café."
-    ]
-  },
-  "10294": {
-    name: "Titanic",
-    ideas: [
-      "Una versión motorizada del Titanic con hélices que giran.",
-      "Un diorama del naufragio en el fondo del océano.",
-      "Un corte transversal detallado que muestre una nueva sección interior.",
-      "Un muelle de la época eduardiana con una grúa y carga.",
-      "Un puente de hierro largo y ornamentado para trenes.",
-      "La fachada de un gran hotel de lujo de principios del siglo XX.",
-      "Un dirigible zepelín gigante con su torre de amarre."
-    ]
-  },
-  "10307": {
-    name: "Torre Eiffel",
-    ideas: [
-      "Una torre de comunicaciones o una antena de radio gigante.",
-      "Un puente de celosía para un ferrocarril.",
-      "Una escultura abstracta moderna que represente el caos y el orden.",
-      "La estructura de una cúpula geodésica.",
-      "Una grúa de construcción de gran altura.",
-      "La base de lanzamiento de un cohete espacial.",
-      "Un segmento de una montaña rusa con una caída pronunciada."
-    ]
-  },
-  "31147": {
-    name: "Cámara Retro",
-    ideas: [
-      "Una cámara de cine antigua con carretes.",
-      "Un televisor retro con antena.",
-      "Un proyector de diapositivas.",
-      "Un robot fotógrafo con un ojo de lente.",
-      "Un dron de reconocimiento con una cámara montada.",
-      "Una caja registradora antigua.",
-      "Un tocadiscos con un disco de vinilo."
-    ]
+  required: ['setNumber', 'pieces', 'ideas'],
+};
+
+const buildPrompt = (setNumber) => `Actúa como un agente creativo de LEGO. Usa tus conocimientos y recursos para identificar el set de LEGO con número "${setNumber}" y obtener el listado más actualizado posible de sus piezas (incluye identificador, nombre, color predominante y cantidad).
+
+Analiza las piezas disponibles y genera exactamente tres ideas diferentes al modelo oficial. Cada idea debe incluir:
+- Un título inspirador.
+- Una breve descripción de la construcción propuesta.
+- Una lista de instrucciones paso a paso que utilice exclusivamente las piezas del set.
+
+Si alguna información no está disponible, explica la limitación dentro de la descripción de la idea correspondiente. Asegúrate de que el número de set devuelto coincida con "${setNumber}".`;
+
+const parseGeminiResponse = (rawText) => {
+  try {
+    return JSON.parse(rawText);
+  } catch (error) {
+    console.error('No se pudo interpretar la respuesta del modelo:', error);
+    throw new Error('Respuesta del modelo inválida.');
   }
 };
 
 function App() {
   const [setNumber, setSetNumber] = useState('');
-  const [ideas, setIdeas] = useState([]);
   const [setName, setSetName] = useState('');
+  const [pieces, setPieces] = useState([]);
+  const [ideas, setIdeas] = useState([]);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSearch = () => {
-    const foundSet = legoIdeasDB[setNumber];
-    if (foundSet) {
-      setIdeas(foundSet.ideas);
-      setSetName(foundSet.name);
-      setError('');
-    } else {
-      setIdeas([]);
-      setSetName('');
-      setError(`No se encontraron ideas para el set #${setNumber}. Asegúrate de que esté en nuestra base de datos.`);
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const extractTextFromCandidates = (payload) => {
+    const candidates = payload?.candidates || [];
+    const textParts = candidates
+      .flatMap((candidate) => candidate?.content?.parts || [])
+      .map((part) => part?.text?.trim())
+      .filter(Boolean);
+
+    return textParts.join('').trim();
+  };
+
+  const handleSearch = async () => {
+    if (!setNumber.trim()) {
+      setError('Por favor, introduce el número del set de LEGO.');
+      return;
+    }
+
+    if (!apiKey) {
+      setError('No se encontró la clave de la API de Gemini. Añádela al archivo .env.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+    setIdeas([]);
+    setPieces([]);
+    setSetName('');
+
+    try {
+      const prompt = buildPrompt(setNumber.trim());
+      const response = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+        method: 'POST',
+        headers: REQUEST_HEADERS,
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: prompt }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            responseMimeType: 'application/json',
+            responseSchema: RESPONSE_SCHEMA,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        let errorMessage = `Error del servicio: ${response.status}`;
+        const errorBody = await response.text();
+
+        if (errorBody) {
+          try {
+            const errorPayload = JSON.parse(errorBody);
+            if (errorPayload?.error?.message) {
+              errorMessage += ` - ${errorPayload.error.message}`;
+            } else {
+              errorMessage += ` - ${errorBody}`;
+            }
+          } catch (parseError) {
+            errorMessage += ` - ${errorBody}`;
+          }
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const payload = await response.json();
+      const textResponse = extractTextFromCandidates(payload);
+
+      if (!textResponse) {
+        throw new Error('No se recibió contenido del modelo.');
+      }
+
+      const parsed = parseGeminiResponse(textResponse);
+
+      setSetName(parsed.setName || '');
+      setPieces(Array.isArray(parsed.pieces) ? parsed.pieces : []);
+      setIdeas(Array.isArray(parsed.ideas) ? parsed.ideas : []);
+
+      if (!parsed.setName) {
+        setError('El modelo no proporcionó el nombre del set.');
+      }
+
+      if (parsed.setNumber && parsed.setNumber !== setNumber.trim()) {
+        setError('El modelo devolvió información para un número de set distinto. Revisa el resultado.');
+      }
+
+      if (Array.isArray(parsed.ideas) && parsed.ideas.length !== 3) {
+        setError('El modelo no devolvió exactamente tres ideas. Revisa los resultados o inténtalo nuevamente.');
+      }
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'No se pudieron obtener ideas creativas en este momento. Inténtalo nuevamente más tarde.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -113,7 +175,7 @@ function App() {
       <header className="App-header">
         <div className="logo">🧱</div>
         <h1>LEGO Builder Ideas</h1>
-        <p>¿No sabes qué construir? Introduce el número de tu set de LEGO y te daremos 7 ideas.</p>
+        <p>¿No sabes qué construir? Introduce el número de tu set de LEGO y te daremos 3 ideas frescas.</p>
       </header>
       <main>
         <div className="search-container">
@@ -123,19 +185,62 @@ function App() {
             onChange={(e) => setSetNumber(e.target.value)}
             placeholder="Introduce el número del set (ej: 21181)"
           />
-          <button onClick={handleSearch}>Buscar Ideas</button>
+          <button onClick={handleSearch} disabled={isLoading}>
+            {isLoading ? 'Buscando...' : 'Buscar Ideas'}
+          </button>
         </div>
 
         {error && <p className="error-message">{error}</p>}
 
-        {ideas.length > 0 && (
+        {isLoading && <p className="loading-message">Consultando al agente creativo...</p>}
+
+        {(setName || pieces.length > 0 || ideas.length > 0) && (
           <div className="results-container">
-            <h2>Ideas para el set: "{setName}"</h2>
-            <ul>
-              {ideas.map((idea, index) => (
-                <li key={index}>{idea}</li>
-              ))}
-            </ul>
+            {setName && <h2>Ideas para el set: "{setName}"</h2>}
+
+            {pieces.length > 0 && (
+              <section className="pieces-section">
+                <h3>Inventario de piezas</h3>
+                <ul className="pieces-list">
+                  {pieces.map((piece, index) => (
+                    <li key={`${piece.partNumber || index}-${piece.name || 'pieza'}`}>
+                      <strong>{piece.partNumber || 'Sin ID'}</strong> — {piece.name || 'Pieza sin nombre'}
+                      {piece.color ? `, color: ${piece.color}` : ''}
+                      {piece.quantity ? ` (x${piece.quantity})` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {ideas.length > 0 && (
+              <section className="ideas-section">
+                <h3>Propuestas creativas</h3>
+                <ul className="ideas-list">
+                  {ideas.map((idea, index) => {
+                    if (typeof idea === 'string') {
+                      return <li key={`idea-${index}`}>{idea}</li>;
+                    }
+
+                    const instructions = Array.isArray(idea.instructions) ? idea.instructions : [];
+
+                    return (
+                      <li key={idea.title || `idea-${index}`} className="idea-card">
+                        <h4>{idea.title || `Idea ${index + 1}`}</h4>
+                        {idea.description && <p>{idea.description}</p>}
+                        {instructions.length > 0 && (
+                          <ol>
+                            {instructions.map((step, stepIndex) => (
+                              <li key={`step-${stepIndex}`}>{step}</li>
+                            ))}
+                          </ol>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
           </div>
         )}
       </main>

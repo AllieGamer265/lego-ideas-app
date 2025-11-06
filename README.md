@@ -1,13 +1,15 @@
 # LEGO Builder Ideas 🧱
 
-Una sencilla aplicación web que te da 7 ideas creativas para construir con tus sets de LEGO existentes. Simplemente introduce el número del set y descubre nuevas posibilidades.
+Una aplicación web impulsada por IA que analiza los sets de LEGO y genera nuevas construcciones alternativas basadas en el inventario real de piezas. Solo introduce el número del set y deja que el agente creativo haga el resto.
 
 ## ✨ Características
 
 - Interfaz de usuario limpia y fácil de usar.
 - Búsqueda instantánea de ideas por número de set.
-- Base de datos de ejemplo con varios sets populares.
-- Mensajes de error amigables si un set no se encuentra.
+- Integración con la API de Gemini para obtener análisis dinámicos.
+- Inventario estimado de piezas del set consultado.
+- Tres propuestas creativas con instrucciones paso a paso.
+- Mensajes de estado y errores descriptivos para guiarte durante la búsqueda.
 
 ## 🚀 Tecnologías Utilizadas
 
@@ -24,21 +26,26 @@ Una sencilla aplicación web que te da 7 ideas creativas para construir con tus 
     npm install
     ```
 
-3.  **Inicia el servidor de desarrollo:**
+3.  **Configura la clave de la API de Gemini:**
+
+    Crea un archivo `.env` en la raíz del proyecto basándote en `.env.example` y añade tu clave:
+
+    ```bash
+    cp .env.example .env
+    # Edita el archivo y reemplaza "tu_clave_de_gemini" por tu clave real
+    ```
+
+4.  **Inicia el servidor de desarrollo:**
     ```bash
     npm run dev
     ```
 
-4.  Abre tu navegador y ve a la dirección que te indique la terminal (normalmente `http://localhost:5173`).
+5.  Abre tu navegador y ve a la dirección que te indique la terminal (normalmente `http://localhost:5173`).
 
-## 📚 Sets Disponibles en la Base de Datos
+## 🔐 Variables de Entorno
 
-Actualmente, la aplicación cuenta con ideas para los siguientes sets:
+- `VITE_GEMINI_API_KEY`: clave de la API de Gemini con permisos para usar el modelo `gemini-1.5-flash`.
 
-- 21181
-- 31058
-- 10696
-- 31131
-- 10294
-- 10307
-- 31147
+## ⚠️ Aviso
+
+El agente necesita acceso a Internet para consultar la información de los sets y puede tardar unos segundos en generar resultados. Si la API no está disponible o la respuesta no se puede interpretar, se mostrará un mensaje de error y podrás intentar nuevamente.
