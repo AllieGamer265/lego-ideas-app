@@ -82,6 +82,11 @@ main {
   background-color: #a81f15;
 }
 
+.search-container button:disabled {
+  background-color: #c9c9c9;
+  cursor: not-allowed;
+}
+
 .results-container {
   background-color: var(--card-bg);
   border-radius: 8px;
@@ -113,4 +118,40 @@ main {
 .error-message {
   color: var(--accent-color);
   font-weight: bold;
+}
+
+.loading-message {
+  font-weight: 500;
+  color: var(--primary-color);
+}
+
+.pieces-section,
+.ideas-section {
+  margin-top: 1.5rem;
+}
+
+.pieces-list,
+.ideas-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pieces-list li,
+.idea-card {
+  background-color: #f9f9f9;
+  margin-bottom: 10px;
+  padding: 15px;
+  border-radius: 5px;
+  border-left: 5px solid var(--secondary-color);
+}
+
+.idea-card h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--accent-color);
+}
+
+.idea-card ol {
+  margin-top: 0.75rem;
+  padding-left: 1.25rem;
 }
