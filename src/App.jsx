@@ -8,45 +8,40 @@ const REQUEST_HEADERS = {
 };
 
 const RESPONSE_SCHEMA = {
-  type: 'object',
+  type: 'OBJECT',
   properties: {
-    setNumber: { type: 'string' },
-    setName: { type: 'string' },
+    setNumber: { type: 'STRING' },
+    setName: { type: 'STRING' },
     pieces: {
-      type: 'array',
+      type: 'ARRAY',
       items: {
-        type: 'object',
+        type: 'OBJECT',
         properties: {
-          partNumber: { type: 'string' },
-          name: { type: 'string' },
-          color: { type: 'string' },
-          quantity: { type: 'number' },
+          partNumber: { type: 'STRING' },
+          name: { type: 'STRING' },
+          color: { type: 'STRING' },
+          quantity: { type: 'INTEGER' },
         },
         required: ['name'],
-        additionalProperties: false,
       },
     },
     ideas: {
-      type: 'array',
-      minItems: 3,
-      maxItems: 3,
+      type: 'ARRAY',
       items: {
-        type: 'object',
+        type: 'OBJECT',
         properties: {
-          title: { type: 'string' },
-          description: { type: 'string' },
+          title: { type: 'STRING' },
+          description: { type: 'STRING' },
           instructions: {
-            type: 'array',
-            items: { type: 'string' },
+            type: 'ARRAY',
+            items: { type: 'STRING' },
           },
         },
         required: ['title', 'instructions'],
-        additionalProperties: false,
       },
     },
   },
   required: ['setNumber', 'pieces', 'ideas'],
-  additionalProperties: false,
 };
 
 const buildPrompt = (setNumber) => `Actúa como un agente creativo de LEGO. Usa tus conocimientos y recursos para identificar el set de LEGO con número "${setNumber}" y obtener el listado más actualizado posible de sus piezas (incluye identificador, nombre, color predominante y cantidad).
@@ -124,7 +119,23 @@ function App() {
       });
 
       if (!response.ok) {
-        throw new Error(`Error del servicio: ${response.status}`);
+        let errorMessage = `Error del servicio: ${response.status}`;
+        const errorBody = await response.text();
+
+        if (errorBody) {
+          try {
+            const errorPayload = JSON.parse(errorBody);
+            if (errorPayload?.error?.message) {
+              errorMessage += ` - ${errorPayload.error.message}`;
+            } else {
+              errorMessage += ` - ${errorBody}`;
+            }
+          } catch (parseError) {
+            errorMessage += ` - ${errorBody}`;
+          }
+        }
+
+        throw new Error(errorMessage);
       }
 
       const payload = await response.json();
@@ -147,9 +158,13 @@ function App() {
       if (parsed.setNumber && parsed.setNumber !== setNumber.trim()) {
         setError('El modelo devolvió información para un número de set distinto. Revisa el resultado.');
       }
+
+      if (Array.isArray(parsed.ideas) && parsed.ideas.length !== 3) {
+        setError('El modelo no devolvió exactamente tres ideas. Revisa los resultados o inténtalo nuevamente.');
+      }
     } catch (err) {
       console.error(err);
-      setError('No se pudieron obtener ideas creativas en este momento. Inténtalo nuevamente más tarde.');
+      setError(err instanceof Error ? err.message : 'No se pudieron obtener ideas creativas en este momento. Inténtalo nuevamente más tarde.');
     } finally {
       setIsLoading(false);
     }
